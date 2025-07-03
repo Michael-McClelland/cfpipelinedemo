@@ -1,6 +1,10 @@
 name: CloudFormation Pipeline
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +22,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/ChangesetRole
+          role-to-assume: arn:aws:iam::398930073421:role/example
           aws-region: us-east-2
       
       - name: Create changeset
@@ -26,10 +30,18 @@ jobs:
         run: |
           changeset_name="changeset-$(date +%s)"
           
+          # Check if stack exists
+          if aws cloudformation describe-stacks --stack-name example >/dev/null 2>&1; then
+            changeset_type="UPDATE"
+          else
+            changeset_type="CREATE"
+          fi
+          
           if aws cloudformation create-change-set \
             --stack-name example \
             --template-body file://example.yml \
             --change-set-name "$changeset_name" \
+            --change-set-type "$changeset_type" \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
             
             aws cloudformation wait change-set-create-complete \
@@ -80,7 +92,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/DeploymentRole
+          role-to-assume: arn:aws:iam::398930073421:role/example
           aws-region: us-east-2
       
       - name: Execute deployment
@@ -90,5 +102,9 @@ jobs:
             --stack-name example \
             --change-set-name "$changeset_name"
           
-          aws cloudformation wait stack-update-complete \
-            --stack-name example
+          # Wait for appropriate completion based on changeset type
+          if aws cloudformation describe-stacks --stack-name example --query 'Stacks[0].StackStatus' --output text | grep -q CREATE; then
+            aws cloudformation wait stack-create-complete --stack-name example
+          else
+            aws cloudformation wait stack-update-complete --stack-name example
+          fi
