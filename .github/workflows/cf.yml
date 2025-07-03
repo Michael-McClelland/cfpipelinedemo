@@ -1,0 +1,98 @@
+name: CloudFormation Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  changeset:
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.changeset.outputs.has-changes }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::398930073421:role/example
+          aws-region: us-east-2
+      
+      - name: Create changeset
+        id: changeset
+        run: |
+          changeset_name="changeset-$(date +%s)"
+          
+          if aws cloudformation create-change-set \
+            --stack-name example \
+            --template-body file://example.yaml \
+            --change-set-name "$changeset_name" \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
+            
+            aws cloudformation wait change-set-create-complete \
+              --stack-name example \
+              --change-set-name "$changeset_name"
+            
+            changes=$(aws cloudformation describe-change-set \
+              --stack-name example \
+              --change-set-name "$changeset_name" \
+              --query 'length(Changes)')
+            
+            if [ "$changes" -gt 0 ]; then
+              echo "has-changes=true" >> $GITHUB_OUTPUT
+              echo "changeset-name=$changeset_name" >> $GITHUB_OUTPUT
+            else
+              echo "has-changes=false" >> $GITHUB_OUTPUT
+              aws cloudformation delete-change-set \
+                --stack-name example \
+                --change-set-name "$changeset_name"
+            fi
+          else
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Store changeset artifact
+        if: steps.changeset.outputs.has-changes == 'true'
+        run: |
+          echo "${{ steps.changeset.outputs.changeset-name }}" > changeset-name.txt
+      
+      - name: Upload changeset artifact
+        if: steps.changeset.outputs.has-changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changeset
+          path: changeset-name.txt
+
+  deploy:
+    needs: changeset
+    if: needs.changeset.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    environment: cloudformationexampledev
+    steps:
+      - name: Download changeset artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: changeset
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::398930073421:role/example
+          aws-region: us-east-2
+      
+      - name: Execute deployment
+        run: |
+          changeset_name=$(cat changeset-name.txt)
+          aws cloudformation execute-change-set \
+            --stack-name example \
+            --change-set-name "$changeset_name"
+          
+          aws cloudformation wait stack-update-complete \
+            --stack-name example

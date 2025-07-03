@@ -1,0 +1,13 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Simple S3 bucket for example pipeline
+
+Resources:
+  ExampleBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: example-pipeline-bucket-398930073421-us-east-2
+
+Outputs:
+  BucketName:
+    Description: Name of the created S3 bucket
+    Value: !Ref ExampleBucket

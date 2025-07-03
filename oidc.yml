@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: OIDC roles for GitHub Actions CloudFormation pipeline
+
+Parameters:
+  CreateOIDCProvider:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Whether to create the OIDC provider
+
+Conditions:
+  ShouldCreateOIDCProvider: !Equals [!Ref CreateOIDCProvider, 'true']
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCIdentityProvider
+    Condition: ShouldCreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  ChangesetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ChangesetRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If 
+                - ShouldCreateOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:Michael-McClelland/cfpipelinedemo:*
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: CloudFormationChangesetPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplate
+                Resource: '*'
+
+  DeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DeploymentRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If 
+                - ShouldCreateOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:Michael-McClelland/cfpipelinedemo:environment:cloudformationexampledev
+      Policies:
+        - PolicyName: CloudFormationDeploymentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - s3:*
+                  - iam:PassRole
+                Resource: '*'
+
+Outputs:
+  ChangesetRoleArn:
+    Description: ARN of the changeset role
+    Value: !GetAtt ChangesetRole.Arn
+  DeploymentRoleArn:
+    Description: ARN of the deployment role
+    Value: !GetAtt DeploymentRole.Arn
