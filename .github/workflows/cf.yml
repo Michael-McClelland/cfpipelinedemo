@@ -22,7 +22,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/example
+          role-to-assume: arn:aws:iam::398930073421:role/ChangesetRole
           aws-region: us-east-2
       
       - name: Create changeset
@@ -92,7 +92,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/example
+          role-to-assume: arn:aws:iam::398930073421:role/DeploymentRole
           aws-region: us-east-2
       
       - name: Execute deployment
