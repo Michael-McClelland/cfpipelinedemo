@@ -26,19 +26,33 @@ jobs:
         run: |
           changeset_name="changeset-$(date +%s)"
           
-          # Check if stack exists
+          # Check if stack exists and create changeset accordingly
           if aws cloudformation describe-stacks --stack-name example >/dev/null 2>&1; then
-            changeset_type="UPDATE"
+            # Stack exists - UPDATE changeset (no --change-set-type needed)
+            if aws cloudformation create-change-set \
+              --stack-name example \
+              --template-body file://example.yml \
+              --change-set-name "$changeset_name" \
+              --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
+              changeset_created=true
+            else
+              changeset_created=false
+            fi
           else
-            changeset_type="CREATE"
+            # Stack doesn't exist - CREATE changeset
+            if aws cloudformation create-change-set \
+              --stack-name example \
+              --template-body file://example.yml \
+              --change-set-name "$changeset_name" \
+              --change-set-type CREATE \
+              --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
+              changeset_created=true
+            else
+              changeset_created=false
+            fi
           fi
           
-          if aws cloudformation create-change-set \
-            --stack-name example \
-            --template-body file://example.yml \
-            --change-set-name "$changeset_name" \
-            --change-set-type "$changeset_type" \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
+          if [ "$changeset_created" = true ]; then
             
             aws cloudformation wait change-set-create-complete \
               --stack-name example \
