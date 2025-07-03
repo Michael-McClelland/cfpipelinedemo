@@ -28,7 +28,7 @@ jobs:
           
           if aws cloudformation create-change-set \
             --stack-name example \
-            --template-body file://example.yaml \
+            --template-body file://example.yml \
             --change-set-name "$changeset_name" \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM; then
             
