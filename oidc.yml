@@ -7,6 +7,18 @@ Parameters:
     Default: 'false'
     AllowedValues: ['true', 'false']
     Description: Whether to create the OIDC provider
+  
+  GitHubOrganization:
+    Type: String
+    Description: GitHub organization name
+  
+  RepositoryName:
+    Type: String
+    Description: GitHub repository name
+  
+  Environment:
+    Type: String
+    Description: Environment name for deployment role
 
 Conditions:
   ShouldCreateOIDCProvider: !Equals [!Ref CreateOIDCProvider, 'true']
@@ -40,7 +52,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: repo:Michael-McClelland/cfpipelinedemo:*
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrganization}/${RepositoryName}:*
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/ReadOnlyAccess
       Policies:
@@ -75,7 +87,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: repo:Michael-McClelland/cfpipelinedemo:environment:cloudformationexampledev
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrganization}/${RepositoryName}:environment:${Environment}
       Policies:
         - PolicyName: CloudFormationDeploymentPolicy
           PolicyDocument:
@@ -87,11 +99,3 @@ Resources:
                   - s3:*
                   - iam:PassRole
                 Resource: '*'
-
-Outputs:
-  ChangesetRoleArn:
-    Description: ARN of the changeset role
-    Value: !GetAtt ChangesetRole.Arn
-  DeploymentRoleArn:
-    Description: ARN of the deployment role
-    Value: !GetAtt DeploymentRole.Arn

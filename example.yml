@@ -5,7 +5,7 @@ Resources:
   ExampleBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: example-pipeline-bucket-398930073421-us-east-2
+      BucketName: !Sub example-pipeline-bucket-${AWS::AccountId}-${AWS::Region}
 
 Outputs:
   BucketName:

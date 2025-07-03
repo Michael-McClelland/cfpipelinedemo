@@ -3,6 +3,10 @@ name: CloudFormation Pipeline
 on:
   workflow_dispatch:
 
+env:
+  CHANGESET_ROLE: arn:aws:iam::${{ vars.DEV_ACCOUNT_NUMBER }}:role/ChangesetRole
+  DEPLOYMENT_ROLE: arn:aws:iam::${{ vars.DEV_ACCOUNT_NUMBER }}:role/DeploymentRole
+
 permissions:
   id-token: write
   contents: read
@@ -18,7 +22,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/ChangesetRole
+          role-to-assume: ${{ env.CHANGESET_ROLE }}
           aws-region: us-east-2
       
       - name: Create changeset
@@ -102,7 +106,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::398930073421:role/DeploymentRole
+          role-to-assume: ${{ env.DEPLOYMENT_ROLE }}
           aws-region: us-east-2
       
       - name: Execute deployment
